@@ -1,53 +1,54 @@
 #!/usr/bin/python3
 
 # https://github.com/smoya/SPI_II2C_LCD_for_ElecFreaks1602/blob/master/LiquidCrystal.h
-# 
+#
 # #ifndef LiquidCrystal_h
 # #define LiquidCrystal_h
-# 
+#
 # #include <inttypes.h>
 # #include "Print.h"
-# #include "MCP23008.h"
-# 
-# // commands
-# #define LCD_CLEARDISPLAY 0x01
-# #define LCD_RETURNHOME 0x02
-# #define LCD_ENTRYMODESET 0x04
-# #define LCD_DISPLAYCONTROL 0x08
-# #define LCD_CURSORSHIFT 0x10
-# #define LCD_FUNCTIONSET 0x20
-# #define LCD_SETCGRAMADDR 0x40
-# #define LCD_SETDDRAMADDR 0x80
-# 
-# // flags for display entry mode
-# #define LCD_ENTRYRIGHT 0x00
-# #define LCD_ENTRYLEFT 0x02
-# #define LCD_ENTRYSHIFTINCREMENT 0x01
-# #define LCD_ENTRYSHIFTDECREMENT 0x00
-# 
-# // flags for display on/off control
-# #define LCD_DISPLAYON 0x04
-# #define LCD_DISPLAYOFF 0x00
-# #define LCD_CURSORON 0x02
-# #define LCD_CURSOROFF 0x00
-# #define LCD_BLINKON 0x01
-# #define LCD_BLINKOFF 0x00
-# 
-# // flags for display/cursor shift
-# #define LCD_DISPLAYMOVE 0x08
-# #define LCD_CURSORMOVE 0x00
-# #define LCD_MOVERIGHT 0x04
-# #define LCD_MOVELEFT 0x00
-# 
-# // flags for function set
-# #define LCD_8BITMODE 0x10
-# #define LCD_4BITMODE 0x00
-# #define LCD_2LINE 0x08
-# #define LCD_1LINE 0x00
-# #define LCD_5x10DOTS 0x04
-# #define LCD_5x8DOTS 0x00
+from MCP23008 import *
+#
+# commands
+LCD_CLEARDISPLAY = 0x01
+LCD_RETURNHOME = 0x02
+LCD_ENTRYMODESET = 0x04
+LCD_DISPLAYCONTROL = 0x08
+LCD_CURSORSHIFT = 0x10
+LCD_FUNCTIONSET = 0x20
+LCD_SETCGRAMADDR = 0x40
+LCD_SETDDRAMADDR = 0x80
+#
+# flags for display entry mode
+LCD_ENTRYRIGHT = 0x00
+LCD_ENTRYLEFT = 0x02
+LCD_ENTRYSHIFTINCREMENT = 0x01
+LCD_ENTRYSHIFTDECREMENT = 0x00
+#
+# flags for display on/off control
+LCD_DISPLAYON = 0x04
+LCD_DISPLAYOFF = 0x00
+LCD_CURSORON = 0x02
+LCD_CURSOROFF = 0x00
+LCD_BLINKON = 0x01
+LCD_BLINKOFF = 0x00
+#
+# flags for display/cursor shift
+LCD_DISPLAYMOVE = 0x08
+LCD_CURSORMOVE = 0x00
+LCD_MOVERIGHT = 0x04
+LCD_MOVELEFT = 0x00
+#
+# flags for function set
+LCD_8BITMODE = 0x10
+LCD_4BITMODE = 0x00
+LCD_2LINE = 0x08
+LCD_1LINE = 0x00
+LCD_5x10DOTS = 0x04
+LCD_5x8DOTS = 0x00
 # 
 # class LiquidCrystal : public Print {
+class LiquidCrystal:
 # public:
 #   LiquidCrystal(uint8_t rs, uint8_t enable,
 # 		uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
@@ -192,6 +193,18 @@
 #   
 #   // we can't begin() yet :(
 # }
+  def __init__( self, i2caddr ):
+    self._i2cAddr = i2caddr
+    self._displayfunction = LCD_4BITMODE | LCD_1LINE | LCD_5x8DOTS
+	
+    # the I/O expander pinout
+    self._rs_pin = 7
+    self._rw_pin = 255
+    self._enable_pin = 6
+    self._data_pins = [ 5,  # really d4
+                        4,  # really d5
+                        3,  # really d6
+                        2 ] # really d7
 # 
 # 
 # LiquidCrystal::LiquidCrystal(uint8_t data, uint8_t clock, uint8_t latch ) {
@@ -258,46 +271,39 @@
 # }
 # 
 # void LiquidCrystal::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
-#   // check if i2c
-#   if (_i2cAddr != 255) {
-#     _i2c.begin(_i2cAddr);
-# 
-#     _i2c.pinMode(1, OUTPUT); // backlight
-#     _i2c.digitalWrite(1, HIGH); // backlight
-# 
-#     
-#     _i2c.pinMode(_rs_pin, OUTPUT);
-#     _i2c.pinMode(_enable_pin, OUTPUT);
-#   } else if (_SPIclock != 255) {
-#     _SPIbuff = 0x80; // backlight
-#   }
-# 
-# 
-# 
-#   if (lines > 1) {
-#     _displayfunction |= LCD_2LINE;
-#   }
-#   _numlines = lines;
-#   _currline = 0;
-# 
-#   // for some 1 line displays you can select a 10 pixel high font
-#   if ((dotsize != 0) && (lines == 1)) {
-#     _displayfunction |= LCD_5x10DOTS;
-#   }
-# 
-#   // SEE PAGE 45/46 FOR INITIALIZATION SPECIFICATION!
-#   // according to datasheet, we need at least 40ms after power rises above 2.7V
-#   // before sending commands. Arduino can turn on way befer 4.5V so we'll wait 50
-#   delayMicroseconds(50000); 
-#   // Now we pull both RS and R/W low to begin commands
-#   _digitalWrite(_rs_pin, LOW);
-#   _digitalWrite(_enable_pin, LOW);
-#   if (_rw_pin != 255) { 
-#     _digitalWrite(_rw_pin, LOW);
-#   }
-#   
-#   //put the LCD into 4 bit or 8 bit mode
-#   if (! (_displayfunction & LCD_8BITMODE)) {
+  def begin( self, cols, lines, dotsize ):
+    # check if i2c
+    if self._i2cAddr != 255:
+        self._i2c.begin( self._i2cAddr )
+        self._i2c.pinMode( 1, OUTPUT ) # backlight
+        self._i2c.digitalWrite( 1, HIGH )  # backlight
+
+        self._i2c.pinMode( self._rs_pin, OUTPUT )
+        self._i2c.pinMode( self._enable_pin, OUTPUT )
+    elif _SPIclock != 255:
+        self._SPIbuff = 0x80 # backlight
+
+    if lines > 1:
+        self._displayfunction |= LCD_2LINE
+    self._numlines = lines
+    self._currline = 0
+
+    # for some 1 line displays you can select a 10 pixel high font
+    if dotsize != 0 and lines == 1:
+        _displayfunction |= LCD_5x10DOTS
+
+    #   // SEE PAGE 45/46 FOR INITIALIZATION SPECIFICATION!
+    #   // according to datasheet, we need at least 40ms after power rises above 2.7V
+    #   // before sending commands. Arduino can turn on way befer 4.5V so we'll wait 50
+    delayMicroseconds(50000)
+    #   // Now we pull both RS and R/W low to begin commands
+    self._digitalWrite( self._rs_pin, LOW )
+    self._digitalWrite( self._enable_pin, LOW )
+    if self._rw_pin != 255:
+        self._digitalWrite( self._rw_pin, LOW )
+
+    #   //put the LCD into 4 bit or 8 bit mode
+    if ! ( _displayfunction & LCD_8BITMODE ) ):
 #     // this is according to the hitachi HD44780 datasheet
 #     // figure 24, pg 46
 # 
